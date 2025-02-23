@@ -1,0 +1,6 @@
+use Test;
+use RedEventStore::Client;
+
+pass "replace me";
+
+done-testing;
