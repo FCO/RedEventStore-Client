@@ -9,17 +9,24 @@ method TWEAK(|) { await $!nats.start }
 
 method add-event($event) {
 	my $type = $event.^name;
-	my %data = $event.^attributes.grep(*.has_accessor).map: { .name.substr(2) => .get_value: $event }
+	my %data = $event.^attributes.grep(*.has_accessor).map: -> $attr {
+		do with $attr.get_value: $event {
+			$attr.name.substr(2) => $_
+		}
+	}
 
 	my @types = (|$event.^mro, |$event.^roles).map( *.^name ).grep: { $_ ne <Any Mu>.any };
 
-	await $!nats.request: [ "add_event", |@types ].join("."), %data.&to-json
+	my \answer = await $!nats.request: "add_event", %( :@types, :%data ).&to-json;
+	.return with answer.?json;
+	answer
 }
 
 method get-events(Int $index = 0, :@types, Instant :$from-timestamp, Instant :$to-timestamp, *%pars) {
 	my @events = .json given await $!nats.request:
-		[ "get_events", $index, |@types ].join("."),
+		[ "get_events", $index ].join("."),
 		%(
+			|(:@types if @types),
 			|(:$from-timestamp with $from-timestamp),
 			|(:$to-timestamp with $to-timestamp),
 			|%pars
